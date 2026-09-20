@@ -1,0 +1,6 @@
+{
+  "name": "CineTitle 3D - Generador de Títulos de Video",
+  "description": "Estudio profesional para crear y animar títulos de video en 2D y 3D con fuentes del sistema, soporte alfa transparente, exportación en MP4, MOV y WebM, y capas de texto personalizadas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
