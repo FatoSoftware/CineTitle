@@ -50,6 +50,33 @@ export const StyleInspector: React.FC<StyleInspectorProps> = ({ layer, updateLay
             >
               Degradado
             </button>
+            <button
+              onClick={() =>
+                updateLayer({
+                  fillType: 'animated-gradient',
+                  animatedGradient: layer.animatedGradient || {
+                    enabled: true,
+                    colors: [layer.gradientColors?.[0] || '#ff007f', '#7928ca', '#00f0ff'],
+                    style: 'linear',
+                    speed: 1.0,
+                    angle: layer.gradientAngle || 45,
+                    rotateWithTime: true,
+                    pulseIntensity: 0.35,
+                    blendMode: 'normal',
+                    target: 'layer',
+                    opacity: 1,
+                  },
+                })
+              }
+              className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+                layer.fillType === 'animated-gradient'
+                  ? 'bg-amber-500 text-slate-950 font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>Animado</span>
+            </button>
           </div>
         </label>
 
@@ -71,7 +98,7 @@ export const StyleInspector: React.FC<StyleInspectorProps> = ({ layer, updateLay
               />
             </div>
           </div>
-        ) : (
+        ) : layer.fillType === 'gradient' ? (
           <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 space-y-3">
             {/* Quick Palette Pills */}
             <div>
@@ -162,6 +189,110 @@ export const StyleInspector: React.FC<StyleInspectorProps> = ({ layer, updateLay
               onChange={(gradientAngle) => updateLayer({ gradientAngle })}
               quickResetValue={0}
             />
+          </div>
+        ) : (
+          /* Animated Gradient Controls */
+          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Degradado Animado Activo</span>
+              </span>
+              <span className="text-[10px] text-slate-400">Flujo Continuo</span>
+            </div>
+
+            {/* Color stops */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {(layer.animatedGradient?.colors || ['#ff007f', '#7928ca', '#00f0ff']).map((col, idx) => (
+                <div key={idx} className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                  <input
+                    type="color"
+                    value={col.startsWith('#') ? col : '#ff007f'}
+                    onChange={(e) => {
+                      const currentColors = layer.animatedGradient?.colors || ['#ff007f', '#7928ca', '#00f0ff'];
+                      const nextColors = [...currentColors];
+                      nextColors[idx] = e.target.value;
+                      updateLayer({
+                        animatedGradient: {
+                          ...(layer.animatedGradient || {
+                            enabled: true,
+                            colors: nextColors,
+                            style: 'linear',
+                            speed: 1.0,
+                            angle: 45,
+                            rotateWithTime: true,
+                            pulseIntensity: 0.35,
+                            blendMode: 'normal',
+                            target: 'layer',
+                            opacity: 1,
+                          }),
+                          colors: nextColors,
+                        },
+                      });
+                    }}
+                    className="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+                  />
+                  <span className="text-[9px] font-mono text-slate-300">{col}</span>
+                </div>
+              ))}
+            </div>
+
+            <NumberSliderControl
+              id="style-anim-grad-speed"
+              label="Velocidad de Animación"
+              value={layer.animatedGradient?.speed ?? 1.0}
+              min={0.2}
+              max={3.0}
+              step={0.1}
+              unit="x"
+              onChange={(speed) =>
+                updateLayer({
+                  animatedGradient: {
+                    ...(layer.animatedGradient || {
+                      enabled: true,
+                      colors: ['#ff007f', '#7928ca', '#00f0ff'],
+                      style: 'linear',
+                      speed: 1.0,
+                      angle: 45,
+                      rotateWithTime: true,
+                      pulseIntensity: 0.35,
+                      blendMode: 'normal',
+                      target: 'layer',
+                      opacity: 1,
+                    }),
+                    speed,
+                  },
+                })
+              }
+            />
+
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>Rotar Ángulo 360° en Continuo</span>
+              <input
+                type="checkbox"
+                checked={layer.animatedGradient?.rotateWithTime ?? true}
+                onChange={(e) =>
+                  updateLayer({
+                    animatedGradient: {
+                      ...(layer.animatedGradient || {
+                        enabled: true,
+                        colors: ['#ff007f', '#7928ca', '#00f0ff'],
+                        style: 'linear',
+                        speed: 1.0,
+                        angle: 45,
+                        rotateWithTime: true,
+                        pulseIntensity: 0.35,
+                        blendMode: 'normal',
+                        target: 'layer',
+                        opacity: 1,
+                      }),
+                      rotateWithTime: e.target.checked,
+                    },
+                  })
+                }
+                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+              />
+            </div>
           </div>
         )}
       </div>

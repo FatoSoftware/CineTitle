@@ -6,6 +6,7 @@ export const RESOLUTION_PRESETS: Resolution[] = [
   { id: '2k', name: '2K Quad HD (16:9)', width: 2560, height: 1440, aspectRatio: '16:9' },
   { id: '720p', name: 'HD 720p (16:9)', width: 1280, height: 720, aspectRatio: '16:9' },
   { id: '9:16', name: 'Vertical 9:16 (Reels / TikTok / Shorts)', width: 1080, height: 1920, aspectRatio: '9:16' },
+  { id: 'tablet', name: 'Tablet iPad 4:3 (2048x1536)', width: 2048, height: 1536, aspectRatio: '4:3' },
   { id: '1:1', name: 'Cuadrado 1:1 (Instagram Feed)', width: 1080, height: 1080, aspectRatio: '1:1' },
   { id: '21:9', name: 'Cinemascope 21:9 (Ultra-Panorámico)', width: 2560, height: 1080, aspectRatio: '21:9' },
 ];

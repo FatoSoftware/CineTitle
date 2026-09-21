@@ -11,6 +11,8 @@ import {
   Image as ImageIcon,
   Sparkles,
   Atom,
+  Camera,
+  Sliders,
 } from 'lucide-react';
 import { ProjectSettings, TextLayer, BackgroundSettings } from '../../types';
 import { TextInspector } from './TextInspector';
@@ -24,6 +26,9 @@ import { MaskInspector } from './MaskInspector';
 import { BackgroundInspector } from './BackgroundInspector';
 import { VisualEffectsInspector } from './VisualEffectsInspector';
 import { ParticleInspector } from './ParticleInspector';
+import { CameraInspector } from './CameraInspector';
+import { ColorInspector } from './ColorInspector';
+import { useTheme } from '../../context/ThemeContext';
 
 interface InspectorTabsProps {
   project: ProjectSettings;
@@ -34,7 +39,7 @@ interface InspectorTabsProps {
   setCurrentTime?: (time: number) => void;
 }
 
-type TabType = 'content' | '3d' | 'style' | 'vfx' | 'particles' | 'anim' | 'keyframes' | 'mask' | 'bg';
+type TabType = 'content' | '3d' | 'camera' | 'color' | 'style' | 'vfx' | 'particles' | 'anim' | 'keyframes' | 'mask' | 'bg';
 
 export const InspectorTabs: React.FC<InspectorTabsProps> = ({
   project,
@@ -44,6 +49,7 @@ export const InspectorTabs: React.FC<InspectorTabsProps> = ({
   currentTime = 0,
   setCurrentTime = () => {},
 }) => {
+  const { isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('content');
 
   const selectedLayer = project.layers.find((l) => l.id === selectedLayerId);
@@ -82,6 +88,8 @@ export const InspectorTabs: React.FC<InspectorTabsProps> = ({
   const tabs: { id: TabType; label: string; icon: React.ReactNode; isGlobal?: boolean }[] = [
     { id: 'content', label: contentInfo.label, icon: contentInfo.icon },
     { id: '3d', label: '3D', icon: <Box className="w-3.5 h-3.5" /> },
+    { id: 'camera', label: 'Cámara', icon: <Camera className="w-3.5 h-3.5" />, isGlobal: true },
+    { id: 'color', label: 'Color', icon: <Sliders className="w-3.5 h-3.5" />, isGlobal: true },
     { id: 'style', label: 'Estilo', icon: <Palette className="w-3.5 h-3.5" /> },
     { id: 'vfx', label: 'Efectos', icon: <Sparkles className="w-3.5 h-3.5" /> },
     { id: 'particles', label: 'Partículas', icon: <Atom className="w-3.5 h-3.5" /> },
@@ -94,10 +102,18 @@ export const InspectorTabs: React.FC<InspectorTabsProps> = ({
   return (
     <div
       id="inspector-panel"
-      className="w-84 bg-slate-950 border-l border-slate-800/80 flex flex-col shrink-0 overflow-hidden"
+      className={`w-84 border-l flex flex-col shrink-0 overflow-hidden transition-colors duration-200 ${
+        isDark
+          ? 'bg-slate-950 border-slate-800/80 text-slate-100'
+          : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+      }`}
     >
       {/* Top Tab Bar */}
-      <div className="flex border-b border-slate-800/80 bg-slate-950/80 p-1 gap-0.5 shrink-0 overflow-x-auto">
+      <div
+        className={`flex border-b p-1 gap-0.5 shrink-0 overflow-x-auto ${
+          isDark ? 'border-slate-800/80 bg-slate-950/80' : 'border-slate-200 bg-slate-50'
+        }`}
+      >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -107,7 +123,9 @@ export const InspectorTabs: React.FC<InspectorTabsProps> = ({
               className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition shrink-0 whitespace-nowrap cursor-pointer ${
                 isActive
                   ? 'bg-amber-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                  : isDark
+                  ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
               {tab.icon}
@@ -119,7 +137,22 @@ export const InspectorTabs: React.FC<InspectorTabsProps> = ({
 
       {/* Tab Contents */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'bg' ? (
+        {activeTab === 'camera' ? (
+          <CameraInspector
+            project={project}
+            setProject={setProject}
+            selectedLayer={selectedLayer || null}
+            updateLayer={updateSelectedLayer}
+            currentTime={currentTime}
+          />
+        ) : activeTab === 'color' ? (
+          <ColorInspector
+            project={project}
+            setProject={setProject}
+            selectedLayer={selectedLayer || null}
+            updateLayer={updateSelectedLayer}
+          />
+        ) : activeTab === 'bg' ? (
           <BackgroundInspector
             background={project.background}
             updateBackground={updateBackground}

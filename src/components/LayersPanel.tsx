@@ -22,6 +22,7 @@ import {
   MoveRight,
 } from 'lucide-react';
 import { ProjectSettings, TextLayer, ShapeType, getDefaultVisualEffects, getDefaultAdvancedParticles } from '../types';
+import { useTheme } from '../context/ThemeContext';
 
 interface LayersPanelProps {
   project: ProjectSettings;
@@ -36,6 +37,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   selectedLayerId,
   setSelectedLayerId,
 }) => {
+  const { isDark } = useTheme();
   const [showAddMenu, setShowAddMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -80,6 +82,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
     },
     vfx: getDefaultVisualEffects(),
     particles: getDefaultAdvancedParticles(),
+    parallaxDepth: 0,
     visible: true,
     locked: false,
     opacity: 1,
@@ -302,13 +305,25 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   return (
     <div
       id="layers-panel"
-      className="w-76 bg-slate-950 border-r border-slate-800/80 flex flex-col shrink-0 overflow-hidden relative"
+      className={`w-76 border-r flex flex-col shrink-0 overflow-hidden relative transition-colors duration-200 ${
+        isDark
+          ? 'bg-slate-950 border-slate-800/80 text-slate-100'
+          : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+      }`}
     >
       {/* Header */}
-      <div className="p-3 border-b border-slate-800/80 flex items-center justify-between">
+      <div
+        className={`p-3 border-b flex items-center justify-between ${
+          isDark ? 'border-slate-800/80' : 'border-slate-200'
+        }`}
+      >
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-amber-400" />
-          <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+          <span
+            className={`text-xs font-bold uppercase tracking-wider ${
+              isDark ? 'text-slate-200' : 'text-slate-700'
+            }`}
+          >
             Capas ({project.layers.length})
           </span>
         </div>

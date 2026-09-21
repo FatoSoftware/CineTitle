@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { ProjectSettings, TextLayer, Keyframe } from '../types';
 import { typewriterAudio } from '../utils/typewriterAudio';
+import { useTheme } from '../context/ThemeContext';
 
 interface TimelineProps {
   project: ProjectSettings;
@@ -40,6 +41,7 @@ export const Timeline: React.FC<TimelineProps> = ({
   setIsLooping,
   selectedLayerId,
 }) => {
+  const { isDark } = useTheme();
   const trackRef = useRef<HTMLDivElement | null>(null);
 
   // Active Layer
@@ -207,7 +209,11 @@ export const Timeline: React.FC<TimelineProps> = ({
   return (
     <div
       id="app-timeline"
-      className="h-32 bg-slate-950 border-t border-slate-800/80 px-4 py-2.5 flex flex-col justify-between select-none z-20 shrink-0"
+      className={`h-32 px-4 py-2.5 flex flex-col justify-between select-none z-20 shrink-0 border-t transition-colors duration-200 ${
+        isDark
+          ? 'bg-slate-950 border-slate-800/80 text-slate-100'
+          : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+      }`}
     >
       {/* Top row: Transport Controls, Timecode, Keyframe Actions & Duration Extender */}
       <div className="flex items-center justify-between gap-4">

@@ -1,4 +1,4 @@
-export type ResolutionPreset = '4k' | '2k' | '1080p' | '720p' | '9:16' | '1:1' | '21:9' | 'custom';
+export type ResolutionPreset = '4k' | '2k' | '1080p' | '720p' | '9:16' | '1:1' | '21:9' | 'tablet' | 'custom';
 
 export interface Resolution {
   id: ResolutionPreset;
@@ -8,7 +8,7 @@ export interface Resolution {
   aspectRatio: string;
 }
 
-export type ExportFormat = 'webm-alpha' | 'mp4' | 'mov-alpha' | 'png-sequence' | 'gif' | 'png-frame';
+export type ExportFormat = 'webm-alpha' | 'mp4' | 'mov-alpha' | 'png-sequence' | 'jpeg-sequence' | 'gif' | 'png-frame';
 
 export type MaterialType = 'matte' | 'metal' | 'chrome' | 'gold' | 'neon' | 'glass' | 'synthwave';
 
@@ -505,10 +505,11 @@ export interface TextLayer {
   scale?: number; // 1 = 100%
 
   // Fill
-  fillType: 'solid' | 'gradient';
+  fillType: 'solid' | 'gradient' | 'animated-gradient';
   fillColor: string;
   gradientColors: [string, string];
   gradientAngle: number;
+  animatedGradient?: AnimatedGradientSettings;
 
   // Stroke / Outline
   strokeEnabled: boolean;
@@ -545,6 +546,13 @@ export interface TextLayer {
   // Advanced Particle Systems
   particles?: AdvancedParticlesSettings;
 
+  // Camera, 3D Parallax & Title Transitions
+  parallaxDepth?: number; // -100 (far background) to +100 (foreground), 0 is focal plane
+  sequenceStartTime?: number;
+  sequenceEndTime?: number;
+  transitionIn?: TitleTransitionType;
+  transitionOut?: TitleTransitionType;
+
   // Visibility & State
   visible: boolean;
   locked: boolean;
@@ -567,6 +575,322 @@ export interface BackgroundSettings {
   checkerboardInPreview: boolean;
 }
 
+// ----------------------------------------------------
+// CAMERA & MOTION CONTROL TYPES
+// ----------------------------------------------------
+export type CameraMovementPreset =
+  | 'static'
+  | 'slow-push-in'
+  | 'dolly-out'
+  | 'pan-left-to-right'
+  | 'pan-right-to-left'
+  | 'orbit-arc'
+  | 'crane-up'
+  | 'dolly-zoom-vertigo'
+  | 'handheld-float'
+  | 'custom';
+
+export type ParallaxMode = 'mouse' | 'camera' | 'auto-sway' | 'combined';
+
+export type CameraShakeType =
+  | 'handheld'
+  | 'earthquake'
+  | 'impact'
+  | 'rumble'
+  | 'micro-jitter'
+  | 'chaos-glitch';
+
+export type TitleTransitionType =
+  | 'none'
+  | 'fade'
+  | 'crossfade'
+  | 'dip-to-black'
+  | 'dip-to-white'
+  | 'wipe-horizontal'
+  | 'wipe-radial'
+  | 'wipe-iris'
+  | 'slide-left'
+  | 'slide-right'
+  | 'slide-up'
+  | 'slide-down'
+  | 'morph-particles'
+  | 'zoom-swish'
+  | 'glitch-slice'
+  | '3d-cube-flip';
+
+export interface CameraShakeSettings {
+  enabled: boolean;
+  type: CameraShakeType;
+  intensity: number; // 0 to 80 px amplitude
+  frequency: number; // 1 to 30 Hz
+  rotational: boolean;
+  rotationIntensity: number; // 0 to 15 degrees
+  mode: 'continuous' | 'impact-burst';
+  triggerTime: number; // in seconds
+  decayTime: number; // in seconds (e.g. 0.8s)
+}
+
+export interface ParallaxSettings {
+  enabled: boolean;
+  mode: ParallaxMode;
+  intensity: number; // 0% to 200% (default 100%)
+  smoothing: number; // 0 to 1
+  depthScale: number; // multiplier (e.g. 1.0)
+  autoSwaySpeed: number; // 0.2 to 3.0
+  autoSwayAmount: number; // 0 to 40 px
+}
+
+export interface TitleTransitionSettings {
+  enabled: boolean;
+  type: TitleTransitionType;
+  duration: number; // 0.2s to 3.0s
+  easing: 'easeInOutCubic' | 'easeOutExpo' | 'easeInOutQuad' | 'linear';
+  timingMode: 'auto-sequence' | 'layer-bounds' | 'custom-intervals';
+  intervalDuration?: number; // e.g. 2.5s per title
+  color?: string; // for dip / wipe
+  blurStrength?: number; // for zoom-swish / slide
+}
+
+export interface CameraSettings {
+  enabled: boolean;
+  zoom: number; // 0.2 to 3.0 (default 1.0)
+  panX: number; // -100 to 100 (% of canvas)
+  panY: number; // -100 to 100 (% of canvas)
+  rotation: number; // -180 to 180 (degrees)
+  movementPreset: CameraMovementPreset;
+  movementSpeed: number; // 0.2 to 3.0
+  movementRange: number; // 0.1 to 2.5
+
+  parallax: ParallaxSettings;
+  shake: CameraShakeSettings;
+  transitions: TitleTransitionSettings;
+}
+
+export function getDefaultCameraSettings(): CameraSettings {
+  return {
+    enabled: false,
+    zoom: 1.0,
+    panX: 0,
+    panY: 0,
+    rotation: 0,
+    movementPreset: 'static',
+    movementSpeed: 1.0,
+    movementRange: 1.0,
+    parallax: {
+      enabled: false,
+      mode: 'combined',
+      intensity: 100,
+      smoothing: 0.8,
+      depthScale: 1.0,
+      autoSwaySpeed: 1.0,
+      autoSwayAmount: 18,
+    },
+    shake: {
+      enabled: false,
+      type: 'handheld',
+      intensity: 15,
+      frequency: 8,
+      rotational: true,
+      rotationIntensity: 1.5,
+      mode: 'continuous',
+      triggerTime: 1.0,
+      decayTime: 0.8,
+    },
+    transitions: {
+      enabled: false,
+      type: 'fade',
+      duration: 0.8,
+      easing: 'easeInOutCubic',
+      timingMode: 'auto-sequence',
+      intervalDuration: 2.5,
+      color: '#000000',
+      blurStrength: 8,
+    },
+  };
+}
+
+// ----------------------------------------------------
+// COLOR GRADING, LUTS, GRADIENTS & VIGNETTE TYPES
+// ----------------------------------------------------
+export type LutPreset =
+  | 'none'
+  | 'teal-orange'
+  | 'bleach-bypass'
+  | 'vintage-film'
+  | 'noir-bw'
+  | 'cyber-neon'
+  | 'golden-hour'
+  | 'sci-fi-matrix'
+  | 'western-warm'
+  | 'pastel-soft'
+  | 'horror-cold';
+
+export type VignetteShape = 'ellipse' | 'circle' | 'rectangle';
+
+export type GradientStyle = 'linear' | 'radial' | 'conic' | 'wave';
+
+export interface AnimatedGradientSettings {
+  enabled: boolean;
+  colors: string[]; // 2 to 5 hex colors
+  style: GradientStyle;
+  speed: number; // 0.2 to 4.0
+  angle: number; // initial angle 0-360
+  rotateWithTime: boolean; // continuous 360 degree spin
+  pulseIntensity: number; // 0 to 1
+  blendMode: 'normal' | 'overlay' | 'screen' | 'soft-light' | 'color-dodge';
+  target: 'layer' | 'scene' | 'background';
+  opacity: number; // 0 to 1
+}
+
+export interface ColorCorrectionSettings {
+  brightness: number; // 50 to 150 (100 is normal)
+  contrast: number; // 50 to 200 (100 is normal)
+  saturation: number; // 0 to 250 (100 is normal)
+  hueRotate: number; // -180 to 180 (0 is normal)
+  temperature: number; // -100 (cold blue) to +100 (warm amber)
+  tint: number; // -100 (green) to +100 (magenta)
+  exposure: number; // -2.0 to +2.0 EV (0 is normal)
+  shadows: number; // -50 to +50 (lift or crush darks)
+  highlights: number; // -50 to +50 (soften or boost brights)
+}
+
+export interface VignetteSettings {
+  enabled: boolean;
+  shape: VignetteShape;
+  posX: number; // 0 to 100 (%)
+  posY: number; // 0 to 100 (%)
+  radius: number; // 10 to 150 (%)
+  feather: number; // 0 to 100 (%)
+  roundness: number; // 0 to 100 (%) (for rectangle squircle)
+  intensity: number; // 0 to 100 (%)
+  color: string; // hex (default '#000000')
+  blendMode: 'multiply' | 'normal' | 'soft-light' | 'overlay' | 'screen';
+}
+
+export interface ColorGradingSettings {
+  enabled: boolean;
+  correction: ColorCorrectionSettings;
+  lut: {
+    preset: LutPreset;
+    intensity: number; // 0 to 100 (%)
+  };
+  animatedGradient: AnimatedGradientSettings;
+  vignette: VignetteSettings;
+}
+
+export function getDefaultColorGradingSettings(): ColorGradingSettings {
+  return {
+    enabled: false,
+    correction: {
+      brightness: 100,
+      contrast: 100,
+      saturation: 100,
+      hueRotate: 0,
+      temperature: 0,
+      tint: 0,
+      exposure: 0,
+      shadows: 0,
+      highlights: 0,
+    },
+    lut: {
+      preset: 'none',
+      intensity: 100,
+    },
+    animatedGradient: {
+      enabled: false,
+      colors: ['#ff007f', '#7928ca', '#00f0ff'],
+      style: 'linear',
+      speed: 1.0,
+      angle: 45,
+      rotateWithTime: true,
+      pulseIntensity: 0.35,
+      blendMode: 'overlay',
+      target: 'scene',
+      opacity: 0.5,
+    },
+    vignette: {
+      enabled: false,
+      shape: 'ellipse',
+      posX: 50,
+      posY: 50,
+      radius: 75,
+      feather: 60,
+      roundness: 30,
+      intensity: 70,
+      color: '#000000',
+      blendMode: 'multiply',
+    },
+  };
+}
+
+export interface WatermarkSettings {
+  enabled: boolean;
+  type: 'text' | 'image';
+  text: string;
+  imageUrl?: string;
+  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'mosaic';
+  opacity: number; // 0.1 to 1
+  scale: number; // 0.2 to 2
+  color: string;
+  fontSize: number;
+}
+
+export interface VideoMetadataSettings {
+  title: string;
+  author: string;
+  description: string;
+  copyright: string;
+  year: number;
+}
+
+export interface UserPreset {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  createdAt: string;
+  tags?: string[];
+  thumbnailGradient?: string;
+  duration: number;
+  background: BackgroundSettings;
+  layers: Omit<TextLayer, 'id'>[];
+  camera?: CameraSettings;
+  colorGrading?: ColorGradingSettings;
+}
+
+export interface BatchExportVariation {
+  id: string;
+  name: string;
+  format: ExportFormat;
+  resolution: Resolution;
+  fps: number;
+  textOverride?: string;
+  enabled: boolean;
+}
+
+export function getDefaultWatermarkSettings(): WatermarkSettings {
+  return {
+    enabled: false,
+    type: 'text',
+    text: '© CINETITLE 3D STUDIO',
+    position: 'bottom-right',
+    opacity: 0.7,
+    scale: 1,
+    color: '#ffffff',
+    fontSize: 22,
+  };
+}
+
+export function getDefaultVideoMetadataSettings(): VideoMetadataSettings {
+  return {
+    title: 'Mi Título Cinemático 3D',
+    author: 'CineTitle Studio Creator',
+    description: 'Animación de título 3D para cine, televisión y redes sociales.',
+    copyright: `© ${new Date().getFullYear()} Todos los derechos reservados`,
+    year: new Date().getFullYear(),
+  };
+}
+
 export interface ProjectSettings {
   id: string;
   name: string;
@@ -577,6 +901,10 @@ export interface ProjectSettings {
   fps: 24 | 30 | 60;
   background: BackgroundSettings;
   safeAreasEnabled: boolean;
+  camera?: CameraSettings;
+  colorGrading?: ColorGradingSettings;
+  watermark?: WatermarkSettings;
+  metadata?: VideoMetadataSettings;
   layers: TextLayer[];
 }
 
@@ -589,4 +917,6 @@ export interface TitlePreset {
   duration: number;
   background: BackgroundSettings;
   layers: Omit<TextLayer, 'id'>[];
+  camera?: CameraSettings;
+  colorGrading?: ColorGradingSettings;
 }

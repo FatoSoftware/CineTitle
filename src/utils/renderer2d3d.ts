@@ -1,4 +1,4 @@
-import { ProjectSettings, TextLayer, MaterialType, Keyframe, LayerMaskSettings } from '../types';
+import { ProjectSettings, TextLayer, MaterialType, Keyframe, LayerMaskSettings, WatermarkSettings } from '../types';
 import { typewriterAudio } from './typewriterAudio';
 import {
   renderLensFlareEffect,
@@ -17,6 +17,15 @@ import {
   renderLightTrails,
   renderMagicEffects,
 } from './particleSystemEngine';
+import {
+  computeCameraState,
+  computeLayerParallax,
+  computeLayerTransition,
+} from './cameraMotionEngine';
+import {
+  renderSceneColorGrading,
+  createAnimatedCanvasGradient,
+} from './colorGradingEngine';
 
 // Image Cache for fast frame-by-frame rendering of Image/Logo layers
 const imageCache = new Map<string, HTMLImageElement>();
@@ -600,8 +609,12 @@ function getMaterialDepthColors(material: MaterialType, layer: TextLayer, stepPr
 
 export interface RenderOptions {
   renderSafeAreas?: boolean;
+  socialSafeGuides?: boolean;
   selectedLayerId?: string | null;
   bgMediaElement?: HTMLVideoElement | HTMLImageElement | null;
+  mousePos?: { x: number; y: number };
+  overrideWatermark?: WatermarkSettings;
+  skipWatermark?: boolean;
 }
 
 // Master Render Function
@@ -659,6 +672,35 @@ export function renderFrame(
     ctx.restore();
   }
 
+  // 1.5 Master Camera & Shake computation
+  const cameraState = computeCameraState(
+    project.camera,
+    currentTime,
+    project.duration,
+    width,
+    height
+  );
+
+  const hasCamera =
+    Boolean(project.camera?.enabled) ||
+    cameraState.shakeX !== 0 ||
+    cameraState.shakeY !== 0 ||
+    cameraState.shakeRot !== 0;
+
+  if (hasCamera) {
+    ctx.save();
+    const cx = width / 2;
+    const cy = height / 2;
+    ctx.translate(
+      cx + cameraState.panX + cameraState.shakeX,
+      cy + cameraState.panY + cameraState.shakeY
+    );
+    const totalRot = ((cameraState.rotation + cameraState.shakeRot) * Math.PI) / 180;
+    if (totalRot !== 0) ctx.rotate(totalRot);
+    if (cameraState.zoom !== 1.0) ctx.scale(cameraState.zoom, cameraState.zoom);
+    ctx.translate(-cx, -cy);
+  }
+
   // 2. Render Layers (Back to front)
   // Scale reference: project base design is relative to 1920x1080
   const scale = width / 1920;
@@ -670,33 +712,88 @@ export function renderFrame(
     if (state.opacity <= 0.001) continue;
     if ((!layer.type || layer.type === 'text') && !state.textToRender) continue;
 
+    // 3D Parallax evaluation
+    const parallax = computeLayerParallax(
+      layer,
+      project.camera,
+      options.mousePos,
+      cameraState,
+      currentTime,
+      width,
+      height
+    );
+
+    // Title Transition evaluation
+    const transition = computeLayerTransition(
+      layer,
+      project,
+      currentTime,
+      width,
+      height
+    );
+
+    if (!transition.visible) continue;
+
+    const layerOpacity = state.opacity * transition.opacity;
+    if (layerOpacity <= 0.001) continue;
+
     ctx.save();
-    ctx.globalAlpha = state.opacity;
+    ctx.globalAlpha = layerOpacity;
 
     // Apply Blur filter if active
     if (state.blur > 0.5) {
       ctx.filter = `blur(${state.blur * scale}px)`;
     }
 
-    // Position coordinates
+    // Position coordinates (including parallax and transition displacement)
     const layerX = state.overrideX !== undefined ? state.overrideX : layer.x;
     const layerY = state.overrideY !== undefined ? state.overrideY : layer.y;
-    const anchorX = (layerX / 100) * width + state.offsetX * scale + state.glitchOffset;
-    const anchorY = (layerY / 100) * height + state.offsetY * scale;
+    const anchorX =
+      (layerX / 100) * width +
+      state.offsetX * scale +
+      state.glitchOffset +
+      parallax.offsetX +
+      transition.offsetX;
+    const anchorY =
+      (layerY / 100) * height +
+      state.offsetY * scale +
+      parallax.offsetY +
+      transition.offsetY;
 
-    // Mask Clipping (if enabled)
-    if (layer.mask && layer.mask.enabled && layer.mask.type !== 'none') {
+    // Transition Clipping (Wipe Horizontal or Wipe Iris) or Layer Mask
+    if (transition.clipRect) {
+      ctx.beginPath();
+      ctx.rect(
+        transition.clipRect.x,
+        transition.clipRect.y,
+        transition.clipRect.width,
+        transition.clipRect.height
+      );
+      ctx.clip();
+    } else if (transition.clipCircle) {
+      ctx.beginPath();
+      ctx.arc(
+        transition.clipCircle.cx,
+        transition.clipCircle.cy,
+        Math.max(0, transition.clipCircle.radius),
+        0,
+        Math.PI * 2
+      );
+      ctx.clip();
+    } else if (layer.mask && layer.mask.enabled && layer.mask.type !== 'none') {
       applyLayerMask(ctx, layer.mask, width, height);
     }
 
     ctx.translate(anchorX, anchorY);
 
-    // Apply 2D Scale
-    ctx.scale(state.scaleX, state.scaleY);
+    // Apply 2D Scale with Parallax Depth Scale & Transition Scale
+    const effScaleX = state.scaleX * parallax.depthScale * transition.scale;
+    const effScaleY = state.scaleY * parallax.depthScale * transition.scale;
+    ctx.scale(effScaleX, effScaleY);
 
-    // Apply 3D Perspective Rotation Simulation (Euler 3D Matrix & Vanishing Point Projection)
-    const rotXRad = (state.rotX * Math.PI) / 180;
-    const rotYRad = (state.rotY * Math.PI) / 180;
+    // Apply 3D Perspective Rotation Simulation (with Parallax Tilt & Cube-Flip Rotation)
+    const rotXRad = ((state.rotX + parallax.tiltX) * Math.PI) / 180;
+    const rotYRad = ((state.rotY + parallax.tiltY + transition.rotY) * Math.PI) / 180;
     const rotZRad = (state.rotZ * Math.PI) / 180;
 
     const cx = Math.cos(rotXRad);
@@ -839,10 +936,148 @@ export function renderFrame(
     renderLensFlareEffect(ctx, layer.vfx.lensFlare, lAnchorX, lAnchorY, width, height, currentTime);
   }
 
+  if (hasCamera) {
+    ctx.restore();
+  }
+
+  // 6.5 Full-Scene Title Transition Flash (Dip to Black or White)
+  if (project.camera?.transitions?.enabled) {
+    for (const layer of project.layers) {
+      const trans = computeLayerTransition(layer, project, currentTime, width, height);
+      if (trans.flashAlpha && trans.flashAlpha > 0.01 && trans.flashColor) {
+        ctx.save();
+        ctx.fillStyle = trans.flashColor;
+        ctx.globalAlpha = Math.min(1, trans.flashAlpha);
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+        break;
+      }
+    }
+  }
+
+  // 6.7 Advanced Color Correction, Cinematic LUTs, Animated Gradients & Vignette
+  if (project.colorGrading?.enabled) {
+    renderSceneColorGrading(ctx, project.colorGrading, width, height, currentTime);
+  }
+
+  // 6.9 Watermark Overlay (Text or Image logo with position, scale, opacity)
+  const activeWatermark =
+    options.overrideWatermark !== undefined ? options.overrideWatermark : project.watermark;
+  if (activeWatermark?.enabled && !options.skipWatermark) {
+    drawWatermark(ctx, width, height, activeWatermark);
+  }
+
   // 7. Safe Areas Overlay (Broadcast Standard: 90% Action Safe & 80% Title Safe)
   if (options.renderSafeAreas) {
     drawSafeAreas(ctx, width, height);
   }
+
+  // 7.5 Social Media Safe Area Guides (TikTok / Reels / Shorts UI overlay bounds)
+  if (options.socialSafeGuides) {
+    drawSocialMediaSafeGuides(ctx, width, height);
+  }
+}
+
+// Draw Watermark Overlay
+export function drawWatermark(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  watermark: WatermarkSettings
+): void {
+  if (!watermark.enabled) return;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.05, Math.min(1, watermark.opacity));
+
+  const padding = Math.max(20, width * 0.035);
+
+  if (watermark.type === 'image' && watermark.imageUrl) {
+    const img = getOrLoadImage(watermark.imageUrl);
+    if (img && img.complete && img.naturalWidth > 0) {
+      const baseW = Math.min(width * 0.25, 240) * watermark.scale;
+      const aspect = img.naturalHeight / img.naturalWidth;
+      const baseH = baseW * aspect;
+
+      let x = padding;
+      let y = padding;
+      if (watermark.position === 'top-right') {
+        x = width - baseW - padding;
+        y = padding;
+      } else if (watermark.position === 'bottom-left') {
+        x = padding;
+        y = height - baseH - padding;
+      } else if (watermark.position === 'bottom-right') {
+        x = width - baseW - padding;
+        y = height - baseH - padding;
+      } else if (watermark.position === 'center') {
+        x = (width - baseW) / 2;
+        y = (height - baseH) / 2;
+      } else if (watermark.position === 'mosaic') {
+        // Diagonal repeating watermark
+        ctx.rotate((-25 * Math.PI) / 180);
+        for (let my = -height; my < height * 2; my += baseH * 2.5) {
+          for (let mx = -width; mx < width * 2; mx += baseW * 2) {
+            ctx.drawImage(img, mx, my, baseW, baseH);
+          }
+        }
+        ctx.restore();
+        return;
+      }
+
+      ctx.drawImage(img, x, y, baseW, baseH);
+      ctx.restore();
+      return;
+    }
+  }
+
+  // Text watermark
+  const text = watermark.text || '© CINETITLE 3D STUDIO';
+  const fontSize = Math.max(12, (watermark.fontSize || 22) * (width / 1920) * watermark.scale);
+  ctx.font = `600 ${fontSize}px sans-serif`;
+  ctx.fillStyle = watermark.color || '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.85)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 2;
+
+  if (watermark.position === 'mosaic') {
+    ctx.rotate((-25 * Math.PI) / 180);
+    const metrics = ctx.measureText(text);
+    const stepX = metrics.width + 120;
+    const stepY = fontSize * 5;
+    for (let my = -height; my < height * 2; my += stepY) {
+      for (let mx = -width; mx < width * 2; mx += stepX) {
+        ctx.fillText(text, mx, my);
+      }
+    }
+    ctx.restore();
+    return;
+  }
+
+  let tx = padding;
+  let ty = padding + fontSize;
+  ctx.textAlign = 'left';
+
+  if (watermark.position === 'top-right') {
+    tx = width - padding;
+    ty = padding + fontSize;
+    ctx.textAlign = 'right';
+  } else if (watermark.position === 'bottom-left') {
+    tx = padding;
+    ty = height - padding;
+    ctx.textAlign = 'left';
+  } else if (watermark.position === 'bottom-right') {
+    tx = width - padding;
+    ty = height - padding;
+    ctx.textAlign = 'right';
+  } else if (watermark.position === 'center') {
+    tx = width / 2;
+    ty = height / 2;
+    ctx.textAlign = 'center';
+  }
+
+  ctx.fillText(text, tx, ty);
+  ctx.restore();
 }
 
 // Apply Layer Mask & Clipping
@@ -939,7 +1174,7 @@ function renderShapeLayer(
 ): void {
   const is3D = layer.threeD.enabled && layer.threeD.depth > 0;
   const maxDepth = layer.threeD.depth * scale * state.depthScale;
-  const { w } = buildShapePath(ctx, layer, scale);
+  const { w, h } = buildShapePath(ctx, layer, scale);
 
   // 3D Extrusion
   if (is3D && maxDepth > 0.5) {
@@ -1015,6 +1250,20 @@ function renderShapeLayer(
   buildShapePath(ctx, layer, scale);
   if (layer.fillType === 'solid') {
     ctx.fillStyle = layer.fillColor;
+  } else if (layer.fillType === 'animated-gradient' || layer.animatedGradient?.enabled) {
+    const animSettings = layer.animatedGradient || {
+      enabled: true,
+      colors: [layer.gradientColors[0], layer.gradientColors[1], '#00F0FF'],
+      style: 'linear',
+      speed: 1.0,
+      angle: layer.gradientAngle || 45,
+      rotateWithTime: true,
+      pulseIntensity: 0.35,
+      blendMode: 'normal',
+      target: 'layer',
+      opacity: 1,
+    };
+    ctx.fillStyle = createAnimatedCanvasGradient(ctx, 0, 0, w, h, animSettings, currentTime);
   } else {
     const gradAngleRad = (layer.gradientAngle * Math.PI) / 180;
     const r = Math.max(20, w / 2);
@@ -1257,6 +1506,28 @@ function renderTextLayerContent(
   // Front Face Fill
   if (layer.fillType === 'solid') {
     ctx.fillStyle = layer.fillColor;
+  } else if (layer.fillType === 'animated-gradient' || layer.animatedGradient?.enabled) {
+    const animSettings = layer.animatedGradient || {
+      enabled: true,
+      colors: [layer.gradientColors[0], layer.gradientColors[1], '#00F0FF'],
+      style: 'linear',
+      speed: 1.0,
+      angle: layer.gradientAngle || 45,
+      rotateWithTime: true,
+      pulseIntensity: 0.35,
+      blendMode: 'normal',
+      target: 'layer',
+      opacity: 1,
+    };
+    ctx.fillStyle = createAnimatedCanvasGradient(
+      ctx,
+      0,
+      0,
+      textBlockW,
+      textBlockH,
+      animSettings,
+      currentTime
+    );
   } else {
     const gradAngleRad = (layer.gradientAngle * Math.PI) / 180;
     const r = fontSize * 1.5;
@@ -1598,6 +1869,60 @@ function drawSafeAreas(ctx: CanvasRenderingContext2D, width: number, height: num
   ctx.fillText('ACTION SAFE 90%', asX + 8, asY + 16);
   ctx.fillStyle = 'rgba(234, 179, 8, 0.9)';
   ctx.fillText('TITLE SAFE 80%', tsX + 8, tsY + 16);
+
+  ctx.restore();
+}
+
+// Draw Social Media Safe Area Guides (TikTok / Reels / Shorts UI overlays)
+function drawSocialMediaSafeGuides(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  ctx.save();
+
+  // 1. Right Side Action Icons Column (Avatar, Like, Comment, Share, Music disc)
+  const iconColW = width * 0.18;
+  const iconColH = height * 0.45;
+  const iconColX = width - iconColW - width * 0.02;
+  const iconColY = height * 0.38;
+
+  ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.roundRect(iconColX, iconColY, iconColW, iconColH, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  // 2. Bottom Captions / Username / Music Bar
+  const bottomBarW = width * 0.78;
+  const bottomBarH = height * 0.22;
+  const bottomBarX = width * 0.04;
+  const bottomBarY = height - bottomBarH - height * 0.04;
+
+  ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+  ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+  ctx.roundRect(bottomBarX, bottomBarY, bottomBarW, bottomBarH, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  // 3. Top Header Bar (Following / For You tabs & Search icon)
+  const topBarW = width * 0.92;
+  const topBarH = height * 0.1;
+  const topBarX = width * 0.04;
+  const topBarY = height * 0.02;
+
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.1)';
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+  ctx.roundRect(topBarX, topBarY, topBarW, topBarH, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  // Labels
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = '#f87171';
+  ctx.fillText('ZONA BOTONES (REELS/TIKTOK)', iconColX + 6, iconColY + 18);
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillText('ZONA SUBTÍTULOS / DESCRIPCIÓN', bottomBarX + 8, bottomBarY + 18);
+  ctx.fillStyle = '#38bdf8';
+  ctx.fillText('ZONA SUPERIOR (NOTCH / TABS)', topBarX + 8, topBarY + 18);
 
   ctx.restore();
 }

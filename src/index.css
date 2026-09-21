@@ -1,1 +1,159 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   HIGH-CONTRAST LIGHT MODE ARCHITECTURE (WCAG AAA / AA compliant)
+   ========================================================================== */
+
+/* Base Light Mode Styles */
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Light Mode Overrides for Panels, Sub-containers & Cards */
+html.light #inspector-panel,
+html.light #layers-panel,
+html.light #app-timeline {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Card & Subsection Backgrounds in Light Mode */
+html.light .bg-slate-950,
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/50,
+html.light .bg-slate-900\/40 {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .bg-slate-900 {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Text High Contrast in Light Mode */
+html.light .text-slate-400 {
+  color: #334155 !important; /* Deep Slate 700 - Contrast > 7.5:1 */
+}
+
+html.light .text-slate-500 {
+  color: #475569 !important; /* Slate 600 - Contrast > 5.5:1 */
+}
+
+html.light .text-slate-300 {
+  color: #1e293b !important; /* Slate 800 - Contrast > 9.5:1 */
+}
+
+html.light .text-slate-200 {
+  color: #0f172a !important; /* Slate 900 - Contrast > 12:1 */
+}
+
+html.light .text-slate-100 {
+  color: #020617 !important; /* Slate 950 - Maximum Contrast */
+}
+
+/* Preserve Light Text Inside Dark Buttons or Badges */
+html.light .bg-amber-500 .text-slate-950,
+html.light .bg-amber-400 .text-slate-950,
+html.light button.bg-amber-500,
+html.light button.bg-amber-400,
+html.light .bg-amber-500 {
+  color: #0f172a !important;
+}
+
+html.light button.bg-slate-800,
+html.light button.bg-slate-900,
+html.light .bg-slate-800:not(input):not(select) {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light button.bg-slate-800:hover,
+html.light button.bg-slate-900:hover {
+  background-color: #cbd5e1 !important;
+  color: #020617 !important;
+}
+
+/* Form Inputs, Selects, Number Sliders & Textareas */
+html.light input:not([type="range"]):not([type="checkbox"]):not([type="color"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+html.light input:not([type="range"]):focus,
+html.light select:focus,
+html.light textarea:focus {
+  border-color: #f59e0b !important;
+  outline: 2px solid rgba(245, 158, 11, 0.25) !important;
+  background-color: #ffffff !important;
+}
+
+/* Range Sliders in Light Mode */
+html.light input[type="range"] {
+  background-color: #cbd5e1 !important;
+}
+
+/* Modal Windows in Light Mode */
+html.light .bg-slate-900.border-slate-800,
+html.light .bg-slate-950.border-slate-800,
+html.light [role="dialog"],
+html.light .fixed .bg-slate-900 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Border visibility in Light Mode */
+html.light .border-slate-800,
+html.light .border-slate-800\/80,
+html.light .border-slate-700,
+html.light .border-slate-700\/80,
+html.light .border-slate-700\/60 {
+  border-color: #cbd5e1 !important;
+}
+
+/* Timeline specific high contrast */
+html.light #timeline-track-container {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light #timeline-track-container .text-slate-500 {
+  color: #475569 !important;
+}
+
+html.light #timeline-track-container .border-slate-800\/80 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Scrollbars in Light Mode */
+html.light ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
